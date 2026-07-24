@@ -517,7 +517,7 @@ function deleteFolderRecursive($dir) {
         <?php endif; ?>
         <form method="POST" action="">
             <input type="text" name="username" placeholder="Username" required>
-            <input type="password" name="password" placeholder="Password (leave blank for dev root/admin)">
+            <input type="password" name="password" placeholder="Password">
             <button type="submit" name="signin" class="btn-submit">Login</button>
         </form>
     </div>
