@@ -402,6 +402,15 @@ function deleteFolderRecursive($dir) {
 
         .dashboard-container { max-width: 1200px; margin: 30px auto; padding: 0 20px; }
         .shelf-title { font-size: 1.4rem; color: #ff4500; margin-bottom: 20px; font-weight: bold; border-left: 4px solid #ff4500; padding-left: 10px; user-select: none; cursor: default; }
+        
+        /* Search Box Styles (Right Aligned) */
+        .search-container { display: flex; justify-content: flex-end; margin-bottom: 25px; }
+        .search-form { display: flex; gap: 10px; width: 100%; max-width: 400px; }
+        .search-input { flex: 1; background: #1a1a1a; border: 1px solid #333; padding: 10px 15px; border-radius: 6px; color: #fff; font-size: 14px; outline: none; transition: border-color 0.2s; }
+        .search-input:focus { border-color: #ff4500; }
+        .btn-clear { background: #333; color: #ccc; border: 1px solid #444; padding: 10px 15px; border-radius: 6px; text-decoration: none; font-size: 14px; display: none; align-items: center; justify-content: center; cursor: pointer; }
+        .btn-clear:hover { background: #444; color: #fff; }
+
         .manga-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; margin-bottom: 45px; }
         @media (min-width: 600px) { .manga-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; } }
         .manga-card { display: flex; flex-direction: column; text-decoration: none; color: #fff; background: #1a1a1a; border-radius: 8px; overflow: hidden; border: 1px solid #2d2d2d; transition: transform 0.2s, border-color 0.2s; }
@@ -415,6 +424,8 @@ function deleteFolderRecursive($dir) {
         .tag-badge { background: #333; color: #ff8c00; font-size: 11px; padding: 2px 8px; border-radius: 12px; font-weight: 600; border: 1px solid #444; }
         .overview-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
         .overview-tags .tag-badge { font-size: 13px; padding: 4px 12px; background: #2a2a2a; color: #ff8c00; border-color: #555; }
+
+        .no-results-msg { color: #aaa; margin-top: 10px; display: none; }
 
         .overview-container { max-width: 1000px; margin: 20px auto; padding: 20px; box-sizing: border-box; }
         .overview-header { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 20px; margin-bottom: 30px; }
@@ -674,8 +685,8 @@ function deleteFolderRecursive($dir) {
     <div class="dashboard-container">
         <!-- User's Bookmarks Shelf -->
         <?php if ($userId && !empty($bookmarkedFolders)): ?>
-            <div class="shelf-title">⭐ My Bookmarked Manga</div>
-            <div class="manga-grid">
+            <div class="shelf-title" id="bookmarks-title">⭐ My Bookmarked Manga</div>
+            <div class="manga-grid" id="bookmarks-grid">
                 <?php foreach ($mangas as $index => $path): 
                     $folder = basename($path);
                     if (in_array($folder, $bookmarkedFolders)): ?>
@@ -694,9 +705,20 @@ function deleteFolderRecursive($dir) {
             </div>
         <?php endif; ?>
 
+        <!-- SEARCH BAR RIGHT-ALIGNED ABOVE ALL COLLECTIONS -->
+        <div class="search-container">
+            <div class="search-form">
+                <input type="text" id="liveSearchInput" class="search-input" placeholder="Search title or tag..." autocomplete="off">
+                <button type="button" id="clearSearchBtn" class="btn-clear" onclick="clearSearch()">Clear</button>
+            </div>
+        </div>
+
         <!-- Main Catalog -->
         <div class="shelf-title">📖 All Collections</div>
-        <div class="manga-grid">
+        
+        <p id="noResultsMsg" class="no-results-msg">No manga found matching your search.</p>
+
+        <div class="manga-grid" id="catalog-grid">
             <?php foreach ($mangas as $index => $path): 
                 $folder = basename($path); ?>
                 <a href="?manga=<?= $index ?>" class="manga-card">
@@ -713,6 +735,74 @@ function deleteFolderRecursive($dir) {
             <?php endforeach; ?>
         </div>
     </div>
+
+    <!-- REAL-TIME LIVE SEARCH SCRIPT -->
+    <script>
+    const searchInput = document.getElementById('liveSearchInput');
+    const clearBtn = document.getElementById('clearSearchBtn');
+    const noResultsMsg = document.getElementById('noResultsMsg');
+    const catalogCards = document.querySelectorAll('#catalog-grid .manga-card');
+    const bookmarkCards = document.querySelectorAll('#bookmarks-grid .manga-card');
+    const bookmarksTitle = document.getElementById('bookmarks-title');
+
+    function filterManga() {
+        const query = searchInput.value.toLowerCase().trim();
+        
+        // Show/hide Clear button
+        clearBtn.style.display = query !== '' ? 'inline-flex' : 'none';
+
+        let catalogMatches = 0;
+
+        // Filter Catalog Cards
+        catalogCards.forEach(card => {
+            const title = card.querySelector('.manga-title').textContent.toLowerCase();
+            const tags = Array.from(card.querySelectorAll('.tag-badge')).map(t => t.textContent.toLowerCase());
+            
+            const matchesTitle = title.includes(query);
+            const matchesTags = tags.some(tag => tag.includes(query));
+
+            if (matchesTitle || matchesTags) {
+                card.style.display = 'flex';
+                catalogMatches++;
+            } else {
+                card.style.display = 'none';
+            }
+        });
+
+        // Filter Bookmark Cards (if present)
+        let bookmarkMatches = 0;
+        bookmarkCards.forEach(card => {
+            const title = card.querySelector('.manga-title').textContent.toLowerCase();
+            const tags = Array.from(card.querySelectorAll('.tag-badge')).map(t => t.textContent.toLowerCase());
+
+            if (title.includes(query) || tags.some(tag => tag.includes(query))) {
+                card.style.display = 'flex';
+                bookmarkMatches++;
+            } else {
+                card.style.display = 'none';
+            }
+        });
+
+        // Hide bookmarks section title if no bookmarks match search
+        if (bookmarksTitle) {
+            bookmarksTitle.style.display = bookmarkMatches > 0 || query === '' ? 'block' : 'none';
+        }
+
+        // Display "No results" message if no catalog items match
+        noResultsMsg.style.display = catalogMatches === 0 ? 'block' : 'none';
+    }
+
+    function clearSearch() {
+        searchInput.value = '';
+        filterManga();
+        searchInput.focus();
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', filterManga);
+        searchInput.addEventListener('keyup', filterManga);
+    }
+    </script>
 
 <?php elseif (!$isReadingMode): ?>
     <!-- VIEW 2: MANGA OVERVIEW -->
