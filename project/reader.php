@@ -473,7 +473,7 @@ function deleteFolderRecursive($dir) {
         <?php if (!$isAdminView): ?>
         <div class="selector-group">
             <select onchange="location = this.value;">
-                <option value="reader.php" <?= $isDashboard ? 'selected' : '' ?>>-- Browse --</option>
+                <option value="reader.php" <?= $isDashboard ? 'selected' : '' ?>>-</option>
                 <?php foreach ($mangas as $index => $path): ?>
                     <option value="?manga=<?= $index ?>" <?= (!$isDashboard && $index === $currentMangaIndex) ? 'selected' : '' ?>>
                         <?= htmlspecialchars(cleanName($path)) ?>
