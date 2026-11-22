@@ -38,6 +38,8 @@ $openProjects    = $pdo->query("SELECT COUNT(*) FROM DU_AN WHERE DA_trangthai = 
         <span>🏛️ Nền tảng Freelance & Ký quỹ Blockchain</span>
     </div>
     <div class="user-pill">
+        <button type="button" onclick="connectMetaMask(1337)" id="walletStatus" class="btn btn-sm" style="background:#fff; color:var(--primary);">🦊 Demo (1337)</button>
+        <button type="button" onclick="connectMetaMask(1338)" class="btn btn-sm" style="background:#e8f5e9; color:var(--primary);">🧪 Thực nghiệm (1338)</button>
         <span>👤 <?= e($user['ND_ho'] . ' ' . $user['ND_ten']) ?></span>
         <span class="role-badge"><?= e($role) ?></span>
         <a href="dashboard.php?logout=1" class="btn btn-sm" style="background:rgba(255,255,255,0.18); color:#fff;">Đăng xuất</a>
@@ -53,7 +55,7 @@ $openProjects    = $pdo->query("SELECT COUNT(*) FROM DU_AN WHERE DA_trangthai = 
         <a href="dashboard.php?page=deliverables" class="nav-link <?= $page==='deliverables'?'active':'' ?>">📦 Bàn giao & Nghiệm thu</a>
         <a href="dashboard.php?page=profile" class="nav-link <?= $page==='profile'?'active':'' ?>">🧑‍💻 Hồ sơ & Kỹ năng Freelancer</a>
         <a href="dashboard.php?page=disputes" class="nav-link <?= $page==='disputes'?'active':'' ?>">⚖️ Khiếu nại & Hòa giải</a>
-        <a href="dashboard.php?page=blockchain" class="nav-link <?= $page==='blockchain'?'active':'' ?>">⛓️ Blockchain & Nhật ký hệ thống</a>
+        <a href="dashboard.php?page=blockchain" class="nav-link <?= $page==='blockchain'?'active':'' ?>">⛓️ Blockchain & Thực nghiệm</a>
     </aside>
 
     <main class="main-content">
@@ -266,7 +268,7 @@ $openProjects    = $pdo->query("SELECT COUNT(*) FROM DU_AN WHERE DA_trangthai = 
             <div class="page-header">
                 <div>
                     <h1>Hợp đồng, Cột mốc & Ký quỹ Thanh toán</h1>
-                    <p>Nạp tiền vào quỹ Escrow (KY_QUY) và giải ngân thanh toán (THANH_TOAN)</p>
+                    <p>Nạp tiền vào quỹ Escrow (KY_QUY) qua MetaMask hoặc PHP RPC và giải ngân thanh toán (THANH_TOAN)</p>
                 </div>
             </div>
 
@@ -307,6 +309,7 @@ $openProjects    = $pdo->query("SELECT COUNT(*) FROM DU_AN WHERE DA_trangthai = 
                         $msList = $pdo->prepare("SELECT * FROM MILESTONE WHERE HD_ma = ?");
                         $msList->execute([$c['HD_ma']]);
                         foreach ($msList as $m):
+                            $depositTotal = $m['MS_sotien'] * 1.05 + 4.99;
                         ?>
                         <tr>
                             <td><strong><?= e($m['MS_ten']) ?></strong><br><small style="color:var(--text-muted)"><?= e($m['MS_mota']) ?></small></td>
@@ -319,20 +322,22 @@ $openProjects    = $pdo->query("SELECT COUNT(*) FROM DU_AN WHERE DA_trangthai = 
                             </td>
                             <td>
                                 <?php if ($m['MS_trangthai'] === 'Chờ ký quỹ'): ?>
-                                    <form method="POST" action="actions.php" style="display:flex; gap:6px; align-items:center;">
+                                    <form method="POST" action="actions.php" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
                                         <input type="hidden" name="action" value="fund_escrow">
                                         <input type="hidden" name="ms_ma" value="<?= $m['MS_ma'] ?>">
-                                        <select name="billing_method" class="form-control" style="padding:5px 8px; font-size:12px; width:175px;">
+                                        <select name="billing_method" class="form-control" style="padding:5px 8px; font-size:12px; width:165px;">
+                                            <option>Ví MetaMask (Web3)</option>
                                             <option>Thẻ Visa đuôi 1111</option>
-                                            <option>Mastercard đuôi 8842</option>
                                         </select>
-                                        <button type="submit" class="btn btn-primary btn-sm">Nạp ký quỹ ($<?= number_format($m['MS_sotien']*1.05+4.99, 2) ?>)</button>
+                                        <button type="submit" class="btn btn-primary btn-sm">Nạp ký quỹ ($<?= number_format($depositTotal, 2) ?>)</button>
+                                        <button type="button" onclick="signEscrowTx(event, this.form, <?= $m['MS_ma'] ?>, <?= $depositTotal ?>, 'deposit')" class="btn btn-outline btn-sm">Ký MetaMask</button>
                                     </form>
                                 <?php elseif ($m['MS_trangthai'] === 'Đang thực hiện'): ?>
-                                    <form method="POST" action="actions.php">
+                                    <form method="POST" action="actions.php" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
                                         <input type="hidden" name="action" value="release_milestone">
                                         <input type="hidden" name="ms_ma" value="<?= $m['MS_ma'] ?>">
                                         <button type="submit" class="btn btn-primary btn-sm">Giải ngân ký quỹ</button>
+                                        <button type="button" onclick="signEscrowTx(event, this.form, <?= $m['MS_ma'] ?>, <?= $m['MS_sotien'] ?>, 'release')" class="btn btn-outline btn-sm">Giải ngân MetaMask</button>
                                     </form>
                                 <?php else: ?>
                                     <span style="color:var(--primary); font-weight:600; font-size:13px;">✓ Đã thanh toán & Lưu Blockchain</span>
@@ -639,8 +644,8 @@ $openProjects    = $pdo->query("SELECT COUNT(*) FROM DU_AN WHERE DA_trangthai = 
         <?php elseif ($page === 'blockchain'): ?>
             <div class="page-header">
                 <div>
-                    <h1>Chi tiết Giao dịch Blockchain & Nhật ký Hệ thống</h1>
-                    <p>Biên lai giao dịch bất biến trên chuỗi khối (GIAO_DICH_BLOCKCHAIN) & lịch sử kiểm toán (NHAT_KY_HE_THONG)</p>
+                    <h1>Chi tiết Giao dịch Blockchain, Thực nghiệm & Benchmark</h1>
+                    <p>Biên lai giao dịch bất biến (GIAO_DICH_BLOCKCHAIN), đo hiệu năng Chain ID 1337/1338 & nhật ký kiểm toán</p>
                 </div>
             </div>
 
@@ -659,6 +664,57 @@ $openProjects    = $pdo->query("SELECT COUNT(*) FROM DU_AN WHERE DA_trangthai = 
             </div>
             <?php endif; ?>
 
+            <!-- Bảng Kết quả Thực nghiệm & Benchmark (Chain ID 1337 vs 1338) -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>Thực nghiệm & Benchmark Hiệu năng (Chain ID 1337 vs 1338)</h2>
+                    <form method="POST" action="benchmark.php">
+                        <button type="submit" name="run_benchmark" value="1" class="btn btn-primary btn-sm">Chạy Benchmark (20 / 50 / 100 tx)</button>
+                    </form>
+                </div>
+                <?php
+                $hasBench = false;
+                foreach ([1337 => 'Mạng Blockchain Demo (Chain ID 1337)', 1338 => 'Mạng Blockchain Thực nghiệm (Chain ID 1338)'] as $cid => $title):
+                    $benchFile = __DIR__ . "/assets/benchmark_{$cid}.json";
+                    if (file_exists($benchFile)):
+                        $hasBench = true;
+                        $bData = json_decode(file_get_contents($benchFile), true);
+                ?>
+                    <h3 style="font-size:15px; margin:12px 0 6px; color:var(--primary);"><?= e($title) ?> — Contract: <code><?= e($bData['contractAddress']) ?></code> <small style="color:var(--text-muted); font-weight:400;">(Cập nhật: <?= e($bData['timestamp']) ?>)</small></h3>
+                    <table style="margin-bottom:18px;">
+                        <thead>
+                            <tr>
+                                <th>Số giao dịch</th>
+                                <th>Tỷ lệ thành công</th>
+                                <th>Tổng thời gian</th>
+                                <th>Độ trễ TB (ms)</th>
+                                <th>Min / Max (ms)</th>
+                                <th>Thông lượng (TPS)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($bData['benchmarks'] as $row): ?>
+                            <tr>
+                                <td><strong><?= e((string)$row['batchSize']) ?> tx</strong></td>
+                                <td><span class="badge badge-green"><?= e($row['successRate']) ?></span></td>
+                                <td><?= e($row['totalTimeSec']) ?> s</td>
+                                <td><strong><?= e($row['avgLatencyMs']) ?> ms</strong></td>
+                                <td><?= e($row['minLatencyMs']) ?> / <?= e($row['maxLatencyMs']) ?> ms</td>
+                                <td><strong style="color:var(--primary);"><?= e($row['throughputTps']) ?> TPS</strong></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php
+                    endif;
+                endforeach;
+                if (!$hasBench):
+                ?>
+                    <p style="color:var(--text-muted); font-size:14px;">Chưa có dữ liệu thực nghiệm. Nhấn nút <strong>⚡ Chạy Benchmark (20 / 50 / 100 tx)</strong> ở góc phải để đo hiệu năng trên cả hai mạng Chain ID 1337 và 1338.</p>
+                <?php endif; ?>
+            </div>
+
+            <!-- Bảng Nhật ký Kiểm toán Hệ thống -->
             <div class="card">
                 <div class="card-header"><h2>Nhật ký Kiểm toán Hệ thống (NHAT_KY_HE_THONG)</h2></div>
                 <table>
@@ -692,5 +748,7 @@ $openProjects    = $pdo->query("SELECT COUNT(*) FROM DU_AN WHERE DA_trangthai = 
     </main>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+<script src="assets/web3.js"></script>
 </body>
 </html>
